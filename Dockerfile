@@ -1,12 +1,11 @@
 FROM python:3.9
 
-ENV PYTHONNUMBUFFERED 1
-WORKDIR /app 
+WORKDIR /app
 
-COPY ../../MPM_ORD/backend/requirements.txt /app/requirements.txt
+COPY ./requirements.txt /app/requirements.txt
 
-RUN pip install -r requirements.txt 
+RUN pip install -r /app/requirements.txt
 
-COPY . /app 
+COPY . /app
 
-CMD python main.py
+CMD python app.py
