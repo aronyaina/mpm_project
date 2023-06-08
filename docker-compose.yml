@@ -1,20 +1,20 @@
 version: "3.8"
 services:
-  flask:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - 5000:5000
-    volumes:
-      - .:/app
-    depends_on:
-      - mysql-db
+#  flask:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    ports:
+#      - 5000:5000
+#    volumes:
+#      - .:/app
+#    depends_on:
+#      - mysql-db
   mysql-db:
     image: mysql:8.0.33
     restart: always
     environment:
-      MYSQL_DATABASE: npm_project
+      MYSQL_DATABASE: mpm_project
       MYSQL_USER: useraro
       MYSQL_PASSWORD: root
       MYSQL_ROOT_PASSWORD: root
