@@ -3,64 +3,48 @@ from flask import request, jsonify
 
 from src.models.projectModel import Project
 from src.models.taskModel import Task, db
+import json
 
 
 def create_task(project_id):
-    """
-    Create a new task and associate it with a project.
-
-    Args:
-        project_id (int): The ID of the project to associate the task with.
-
-    Returns:
-        Response: A JSON response containing the created task if successful,
-        or an error message if an error occurs.
-    """
     task_data = request.get_json()
     try:
         project = Project.query.get(project_id)
         if not project:
             return jsonify({"error": "Project not found"}), 404
-        db.create_all()
 
         task_name = task_data.get('name')
         task_duration = task_data.get('duration')
-        previous_tasks = task_data.get('previous_tasks')
+        previous_tasks_ids = task_data.get('previous_tasks_id', [])
 
-        if previous_tasks is not None:
+        if previous_tasks_ids:
             all_exist = True
-            id_not_in_task = []
+            ids_not_in_task = []
 
-            for previous_task in previous_tasks:
-                id = previous_task['id']
-                previous_task_object = Task.query.filter_by(id=id).first()
+            for previous_task_id in previous_tasks_ids:
+                previous_task_object = Task.query.filter_by(id=previous_task_id).first()
 
                 if previous_task_object:
                     continue
                 else:
                     all_exist = False
-                    id_not_in_task.append(id)
+                    ids_not_in_task.append(previous_task_id)
 
             if not all_exist:
                 return jsonify(
-                    {"error": "Previous task does not exist in the database.", "id_not_in_task": id_not_in_task}), 404
+                    {"error": "Previous task does not exist in the database.", "ids_not_in_task": ids_not_in_task}), 404
 
         try:
+            previous_tasks_ids_json = json.dumps(previous_tasks_ids)  # Convert to JSON string
+
             new_task = Task(
                 task_name=task_name,
                 task_duration=task_duration,
-                project_id=project_id
+                project_id=project_id,
+                previous_task_ids=previous_tasks_ids_json,  # Store as JSON string
             )
-
-            if previous_tasks is not None:
-                for previous_task in previous_tasks:
-                    id = previous_task['id']
-                    previous_task_object = Task.query.get(id)
-                    previous_task_data = previous_task_object.to_json()
-                    print(f"previous_task_data:{previous_task_data}")
-                    previous_task_data['previous_task_data'] = previous_task_data
-                    new_task.prevTasks.append(previous_task_data)
-
+            previous_tasks = Task.query.filter(Task.id.in_(previous_tasks_ids)).all()
+            new_task.previous_tasks.extend(previous_tasks)
             db.session.add(new_task)
             db.session.commit()
 
@@ -128,8 +112,10 @@ def get_tasks(project_id):
     try:
         project = Project.query.get(project_id)
         if project:
-            tasks = Task.query.filter_by(projectId=project_id).all()
+            tasks = Task.query.filter_by(project_id=project_id).all()
+            print(tasks)
             task_list = [task.to_json() for task in tasks]
+            print(jsonify(task_list))
             return jsonify(task_list)
         else:
             return jsonify({"error": "Project not found"}), 404
