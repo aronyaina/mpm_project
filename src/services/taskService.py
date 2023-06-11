@@ -12,42 +12,41 @@ def create_task(project_id):
         project = Project.query.get(project_id)
         if not project:
             return jsonify({"error": "Project not found"}), 404
-
+        db.create_all()
         task_name = task_data.get('name')
         task_duration = task_data.get('duration')
-        previous_tasks_ids = task_data.get('previous_tasks_id', [])
+        previous_tasks_names = task_data.get('previous_tasks_id', [])
 
-        if previous_tasks_ids:
-            all_exist = True
-            ids_not_in_task = []
+        if Task.query.filter_by(name=task_name).first():
+            return jsonify({"error": "Task name already exists."}), 400
 
-            for previous_task_id in previous_tasks_ids:
-                previous_task_object = Task.query.filter_by(id=previous_task_id).first()
+        if previous_tasks_names:
+            name_not_in_task = []
 
+            for previous_task_name in previous_tasks_names:
+                previous_task_object = Task.query.filter_by(name=previous_task_name).first()
                 if previous_task_object:
                     continue
                 else:
-                    all_exist = False
-                    ids_not_in_task.append(previous_task_id)
+                    name_not_in_task.append(previous_task_name)
 
-            if not all_exist:
+            if name_not_in_task:
                 return jsonify(
-                    {"error": "Previous task does not exist in the database.", "ids_not_in_task": ids_not_in_task}), 404
+                    {"error": "Previous task name doesn't exist.", "name_not_in_task": name_not_in_task}), 404
 
         try:
-            previous_tasks_ids_json = json.dumps(previous_tasks_ids)  # Convert to JSON string
+            previous_tasks_names_json = json.dumps(previous_tasks_names)  # Convert to JSON string
 
             new_task = Task(
-                task_name=task_name,
-                task_duration=task_duration,
+                name=task_name,
+                duration=task_duration,
                 project_id=project_id,
-                previous_task_ids=previous_tasks_ids_json,  # Store as JSON string
+                previous_tasks_names=previous_tasks_names_json,  # Store as JSON string
             )
-            previous_tasks = Task.query.filter(Task.id.in_(previous_tasks_ids)).all()
+            previous_tasks = Task.query.filter(Task.name.in_(previous_tasks_names)).all()
             new_task.previous_tasks.extend(previous_tasks)
             db.session.add(new_task)
             db.session.commit()
-
             new_task_data = new_task.to_json()
             return jsonify(new_task_data)
         except Exception as e:
@@ -87,7 +86,7 @@ def update_task(project_id, task_id):
 
     except Exception as e:
         print(e)
-        return jsonify({"error": f"An error has occurred: {e}"}), 500
+        return jsonify({"error": e}), 500
 
 
 def delete_task(project_id, task_id):
@@ -105,7 +104,7 @@ def delete_task(project_id, task_id):
             return jsonify({"error": "Project not found"}), 404
     except Exception as e:
         print(e)
-        return jsonify({"error": f"An error has occurred: {e}"}), 500
+        return jsonify({"error": f"{e}"}), 500
 
 
 def get_tasks(project_id):
@@ -113,9 +112,7 @@ def get_tasks(project_id):
         project = Project.query.get(project_id)
         if project:
             tasks = Task.query.filter_by(project_id=project_id).all()
-            print(tasks)
             task_list = [task.to_json() for task in tasks]
-            print(jsonify(task_list))
             return jsonify(task_list)
         else:
             return jsonify({"error": "Project not found"}), 404
@@ -136,20 +133,6 @@ def get_task_by_id(project_id, task_id):
                     return jsonify({"error": "Task not found"}), 404
             else:
                 return jsonify({"error": "Project not found"}), 404
-    except Exception as e:
-        print(e)
-        return jsonify({"error": f"An error has occurred: {e}"}), 500
-
-
-def get_next_task(tasks, next_tasks):
-    try:
-        for task in tasks:
-            task_id = task.id
-            for task_id_prev in task.prevTask["id"]:
-                if task_id_prev in next_tasks:
-                    pass
-                elif task_id_prev == task_id:
-                    next_tasks.append(task_id_prev)
     except Exception as e:
         print(e)
         return jsonify({"error": f"An error has occurred: {e}"}), 500
