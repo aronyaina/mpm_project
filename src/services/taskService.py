@@ -61,32 +61,38 @@ def create_task(project_id):
 def update_task(project_id, task_id):
     try:
         project = Project.query.get(project_id)
-        if project:
-            new_task_name = request.json.get('name')
-            new_task_duration = request.json.get('duration')
-            new_prev_task = request.json.get('previous_task')
-
-            # check value to update, if it exists then replace with value
-            task = Task.query.get(task_id)
-            if new_task_name is not None:
-                task.name = new_task_name
-            if new_task_duration is not None:
-                task.duration = new_task_duration
-            if new_prev_task is not None:
-                task.prevTask = new_prev_task
-            task.datetime = datetime.now()
-
-            if task:
-                db.session.commit()
-                return jsonify(task.to_json())
-            else:
-                return jsonify({"error": "Task not found"}), 404
-        else:
+        if not project:
             return jsonify({"error": "Project not found"}), 404
+
+        task = Task.query.get(task_id)
+        if not task:
+            return jsonify({"error": "Task not found"}), 404
+
+        new_task_name = request.json.get('name')
+        new_task_duration = request.json.get('duration')
+        new_prev_task = request.json.get('previous_task_id')
+
+        if new_task_name is not None:
+            task.name = new_task_name
+        if new_task_duration is not None:
+            task.duration = new_task_duration
+
+        # Check if the previous task exists
+        if new_prev_task is not None:
+            previous_task = Task.query.filter_by(name=new_prev_task).first()
+            if previous_task:
+                task.prevTask = previous_task.id
+            else:
+                return jsonify({"error": "Previous task name doesn't exist.", "name_not_in_task": new_prev_task}), 404
+
+        task.datetime = datetime.now()
+        db.session.commit()
+
+        return jsonify(task.to_json())
 
     except Exception as e:
         print(e)
-        return jsonify({"error": e}), 500
+        return jsonify({"error": "An error occurred."}), 500
 
 
 def delete_task(project_id, task_id):
