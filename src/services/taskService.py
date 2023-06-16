@@ -1,144 +1,48 @@
-from datetime import datetime
-from flask import request, jsonify
-
-from src.models.projectModel import Project
-from src.models.taskModel import Task, db
-import json
+from src.models.taskModel import Task
 
 
-def create_task(project_id):
-    task_data = request.get_json()
-    try:
-        project = Project.query.get(project_id)
-        if not project:
-            return jsonify({"error": "Project not found"}), 404
-        db.create_all()
-        task_name = task_data.get('name')
-        task_duration = task_data.get('duration')
-        previous_tasks_names = task_data.get('previous_tasks_id', [])
+class TaskService:
+    def __init__(self, task):
+        self.next_tasks = []
+        self.task = task
 
-        if Task.query.filter_by(name=task_name).first():
-            return jsonify({"error": "Task name already exists."}), 400
-
-        if previous_tasks_names:
-            name_not_in_task = []
-
-            for previous_task_name in previous_tasks_names:
-                previous_task_object = Task.query.filter_by(name=previous_task_name).first()
-                if previous_task_object:
-                    continue
-                else:
-                    name_not_in_task.append(previous_task_name)
-
-            if name_not_in_task:
-                return jsonify(
-                    {"error": "Previous task name doesn't exist.", "name_not_in_task": name_not_in_task}), 404
-
-        try:
-            previous_tasks_names_json = json.dumps(previous_tasks_names)  # Convert to JSON string
-
-            new_task = Task(
-                name=task_name,
-                duration=task_duration,
-                project_id=project_id,
-                previous_tasks_names=previous_tasks_names_json,  # Store as JSON string
-            )
-            previous_tasks = Task.query.filter(Task.name.in_(previous_tasks_names)).all()
-            new_task.previous_tasks.extend(previous_tasks)
-            db.session.add(new_task)
-            db.session.commit()
-            new_task_data = new_task.to_json()
-            return jsonify(new_task_data)
-        except Exception as e:
-            print(e)  # Print the error for debugging purposes
-            return jsonify({"error": "An error occurred while creating the task."})
-
-    except Exception as e:
-        print(e)  # Print the error for debugging purposes
-        return jsonify({"error": "An error occurred."}), 404
-
-
-def update_task(project_id, task_id):
-    try:
-        project = Project.query.get(project_id)
-        if not project:
-            return jsonify({"error": "Project not found"}), 404
-
-        task = Task.query.get(task_id)
-        if not task:
-            return jsonify({"error": "Task not found"}), 404
-
-        new_task_name = request.json.get('name')
-        new_task_duration = request.json.get('duration')
-        new_prev_task = request.json.get('previous_task_id')
-
-        if new_task_name is not None:
-            task.name = new_task_name
-        if new_task_duration is not None:
-            task.duration = new_task_duration
-
-        # Check if the previous task exists
-        if new_prev_task is not None:
-            previous_task = Task.query.filter_by(name=new_prev_task).first()
-            if previous_task:
-                task.prevTask = previous_task.id
-            else:
-                return jsonify({"error": "Previous task name doesn't exist.", "name_not_in_task": new_prev_task}), 404
-
-        task.datetime = datetime.now()
-        db.session.commit()
-
-        return jsonify(task.to_json())
-
-    except Exception as e:
-        print(e)
-        return jsonify({"error": "An error occurred."}), 500
-
-
-def delete_task(project_id, task_id):
-    try:
-        project = Project.query.get(project_id)
-        if project:
-            task = Task.query.get(task_id)
-            if task:
-                db.session.delete(task)
-                db.session.commit()
-                return jsonify(task.to_json())
-            else:
-                return jsonify({"error": "Task not found"}), 404
+    def get_early_date(self) -> int:
+        if not self.task.previous_tasks:
+            begin_task = Task.query.get(1)
+            self.task.previous_tasks.extend([begin_task])
+            self.task.early_date = self.task.duration + begin_task.early_date
         else:
-            return jsonify({"error": "Project not found"}), 404
-    except Exception as e:
-        print(e)
-        return jsonify({"error": f"{e}"}), 500
+            for previous_task in self.task.previous_tasks:
+                prev_task_early_date = previous_task.early_date
+                if prev_task_early_date >= self.task.early_date:
+                    self.task.early_date = prev_task_early_date + self.task.duration
+        return self.task.early_date
 
-
-def get_tasks(project_id):
-    try:
-        project = Project.query.get(project_id)
-        if project:
-            tasks = Task.query.filter_by(project_id=project_id).all()
-            task_list = [task.to_json() for task in tasks]
-            return jsonify(task_list)
+    def get_late_date(self) -> int:
+        self.next_tasks = [task.to_json() for task in self.task.next_tasks]
+        if not self.next_tasks:
+            end_task = Task.query.get(2)
+            self.task.next_tasks.extend([end_task])
+            end_duration = self.task.early_date + self.task.duration
+            if end_task.early_date <= end_duration:
+                end_task.early_date = self.task.early_date + self.task.duration
+            end_task.late_date = end_task.early_date
+            self.task.late_date = end_task.late_date - self.task.duration
         else:
-            return jsonify({"error": "Project not found"}), 404
-    except Exception as e:
-        print(e)
-        return jsonify({"error": f"An error has occurred: {e}"}), 500
+            for next_task in self.next_tasks:
+                next_task_late_date = next_task.late_date
+                if next_task_late_date <= self.task.late_date:
+                    self.task.late_date = next_task_late_date - self.task.duration
+        if self.task.late_date < 0:
+            return 0
+        else:
+            return self.task.late_date
 
+    def get_margin(self) -> int:
+        self.task.margin_date = self.task.late_date - self.task.early_date
+        return self.task.margin_date
 
-def get_task_by_id(project_id, task_id):
-    try:
-        project = Project.query.get(project_id)
-        if task_id:
-            if project:
-                task = Task.query.get(task_id)
-                if task:
-                    return jsonify(task.to_json())
-                else:
-                    return jsonify({"error": "Task not found"}), 404
-            else:
-                return jsonify({"error": "Project not found"}), 404
-    except Exception as e:
-        print(e)
-        return jsonify({"error": f"An error has occurred: {e}"}), 500
+    def get_critic_path(self) -> bool:
+        if self.task.margin_date == 0:
+            self.task.is_critic = True
+            return self.task.is_critic

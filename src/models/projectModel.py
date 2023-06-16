@@ -7,7 +7,7 @@ class Project(db.Model):
     __tablename__ = 'projects'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False,unique=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
     datetime = db.Column(db.DateTime, default=lambda: datetime.now())
     tasks = db.relationship('Task', backref='projects', lazy=True)
 
@@ -27,5 +27,3 @@ class Project(db.Model):
     def __repr__(self):
         # Return a string representation of the Project object
         return f"({self.id} : {self.name})"
-
-

@@ -13,9 +13,13 @@ def create_app():
         Flask: The configured Flask application instance.
     """
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root@localhost/mpm_project'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root@localhost:3306/mpm_project'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
+
+    with app.app_context():
+        db.create_all()  # Create the database tables
+
     return app
 
 
