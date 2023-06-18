@@ -5,39 +5,7 @@ from flask import request, jsonify
 from database import db
 from src.models.projectModel import Project
 from src.models.taskModel import Task
-from src.services.taskService import TaskService
-
-
-def get_task_by_id(project_id, task_id):
-    try:
-        project = Project.query.get(project_id)
-        if task_id:
-            if project:
-                task = Task.query.get(task_id)
-
-                if task:
-                    return jsonify(task.to_json())
-                else:
-                    return jsonify({"error": "Task not found"}), 404
-            else:
-                return jsonify({"error": "Project not found"}), 404
-    except Exception as e:
-        print(e)
-        return jsonify({"error": f"An error has occurred: {e}"}), 500
-
-
-def get_all_task(project_id):
-    try:
-        project = Project.query.get(project_id)
-        if project:
-            tasks = Task.query.filter_by(project_id=project_id).all()
-            task_list = [task.to_json() for task in tasks]
-            return jsonify(task_list)
-        else:
-            return jsonify({"error": "Project not found"}), 404
-    except Exception as e:
-        print(e)
-        return jsonify({"error": f"{e}"}), 500
+from src.services.taskService import TaskService, synchronize_all_task
 
 
 def create_task(project_id):
@@ -49,7 +17,7 @@ def create_task(project_id):
 
         task_name = task_data.get('name')
         task_duration = task_data.get('duration')
-        previous_tasks_names = task_data.get('previous_task_name', [])
+        previous_tasks_names = task_data.get('previous_tasks_name', [])
 
         if Task.query.filter_by(name=task_name, project_id=project_id).first():
             return jsonify({"error": "Task name already exists."}), 400
@@ -77,22 +45,58 @@ def create_task(project_id):
             new_task.previous_tasks.extend(previous_tasks)
             db.session.add(new_task)
             db.session.commit()
-            new_service = TaskService(new_task)
-            new_service.get_early_date()
-            new_service.get_late_date()
-            new_service.get_margin()
-            new_service.get_critic_path()
-            db.session.commit()
+            new_service = TaskService(new_task, project_id)
+            try:
+                new_service.call_all()
+
+                db.session.commit()
+            except Exception as e:
+                print(e)
+                db.session.delete(Task.query.filter_by(name=task_name).first())
+                db.session.commit()
 
             new_task_data = new_task.to_json()
             return jsonify(new_task_data)
 
         except Exception as e:
             print(e)  # Print the error for debugging purposes
-            return jsonify({"error": e})
+            return jsonify({"error": f"{e}"})
 
     except Exception as e:
         print(e)  # Print the error for debugging purposes
+        return jsonify({"error": f"{e}"}), 500
+
+
+def get_task_by_id(project_id, task_id):
+    try:
+        project = Project.query.get(project_id)
+        if task_id:
+            if project:
+                task = Task.query.get(task_id)
+
+                if task:
+                    return jsonify(task.to_json())
+                else:
+                    return jsonify({"error": "Task not found"}), 404
+            else:
+                return jsonify({"error": "Project not found"}), 404
+    except Exception as e:
+        print(e)
+        return jsonify({"error": f"An error has occurred: {e}"}), 500
+
+
+def get_all_task(project_id):
+    try:
+        project = Project.query.get(project_id)
+        if project:
+            synchronize_all_task(project_id)
+            tasks = Task.query.filter_by(project_id=project_id).all()
+            task_list = [task.to_json() for task in tasks]
+            return jsonify(task_list)
+        else:
+            return jsonify({"error": "Project not found"}), 404
+    except Exception as e:
+        print(e)
         return jsonify({"error": f"{e}"}), 500
 
 
@@ -109,11 +113,13 @@ def delete_task_by_id(project_id, task_id):
             return jsonify({"error": "Impossible to delete end task"})
         if not task:
             return jsonify({"error": "Task not found"}), 404
-
+        # begin task
         tasks_with_previous_task = Task.query.filter(Task.previous_tasks.any(id=task_id)).all()
 
         for t in tasks_with_previous_task:
             t.previous_tasks.remove(task)
+            # new_task_service = TaskService(t, project_id)
+            # new_task_service.get_early_date()
 
         db.session.delete(task)
         db.session.commit()

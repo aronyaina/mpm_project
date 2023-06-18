@@ -2,6 +2,7 @@ from flask import Flask
 from flask_migrate import Migrate
 from src.routes.projectRoute import project_blueprint
 from src.routes.taskRoute import task_blueprint
+from flask_cors import CORS
 from database import db
 
 
@@ -13,6 +14,7 @@ def create_app():
         Flask: The configured Flask application instance.
     """
     app = Flask(__name__)
+    CORS(app)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root@localhost:3306/mpm_project'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)

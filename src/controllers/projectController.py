@@ -21,6 +21,7 @@ def create_project():
             duration=0,
             project_id=new_project.id
         )
+        begin_task.is_critic = True
         db.session.add(begin_task)
 
         end_task = Task(
@@ -28,6 +29,7 @@ def create_project():
             duration=0,
             project_id=new_project.id
         )
+        end_task.is_critic = True
         db.session.add(end_task)
         db.session.commit()
 

@@ -56,7 +56,7 @@ class Task(db.Model):
             'late_date': self.late_date,
             'margin_date': self.margin_date,
             'is_critic': self.is_critic,
-            'next_tasks': [task.name for task in self.next_tasks],
-            'previous_tasks': [task.name for task in self.previous_tasks]
+            'next_tasks': [task.id for task in self.next_tasks],
+            'previous_tasks': [task.id for task in self.previous_tasks]
         }
         return task_json
