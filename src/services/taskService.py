@@ -12,7 +12,7 @@ class TaskService:
         if not self.task.previous_tasks:
             begin_task = Task.query.filter_by(name="Begin Task", project_id=self.project_id).first()
             self.task.previous_tasks.extend([begin_task])
-            self.task.early_date = self.task.duration + begin_task.early_date
+            self.task.early_date = begin_task.early_date
             self.next_tasks = [task.to_json() for task in self.task.next_tasks]
         else:
             for previous_task in self.task.previous_tasks:

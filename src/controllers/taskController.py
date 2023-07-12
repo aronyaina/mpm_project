@@ -89,6 +89,14 @@ def get_all_task(project_id):
     try:
         project = Project.query.get(project_id)
         if project:
+            task_name = request.args.get('task_name')
+            if task_name:
+                task = Task.query.filter_by(name=task_name).first()
+                if task:
+                    return jsonify(task.to_json())
+                else:
+                    return jsonify({"error": "Task not found"}), 404
+
             synchronize_all_task(project_id)
             tasks = Task.query.filter_by(project_id=project_id).all()
             task_list = [task.to_json() for task in tasks]
@@ -167,3 +175,21 @@ def update_task_by_id(project_id, task_id):
         print(e)
         return jsonify({"error": "An error occurred."}), 500
     # Call the update_task function to update a task by its ID within a specific project
+
+# def get_task_by_name(project_id):
+#     task_name = request.args.get('task_name')
+#     print(task_name)
+#     try:
+#         project = Project.query.get(project_id)
+#         if task_name:
+#             if project:
+#                 task = Task.query.filter_by(name=task_name).first()
+#                 if task:
+#                     return jsonify(task.to_json())
+#                 else:
+#                     return jsonify({"error": "Task not found"}), 404
+#             else:
+#                 return jsonify({"error": "Project not found"}), 404
+#     except Exception as e:
+#         print(e)
+#         return jsonify({"error": f"An error has occurred: {e}"}), 500
