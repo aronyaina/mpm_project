@@ -21,15 +21,14 @@ class TaskService:
 
             self.task.previous_tasks = self.previous_tasks
             self.task.early_date = 0
+
             for previous_task in self.task.previous_tasks:
                 if previous_task.name == "Begin Task":
                     self.task.early_date = 0
+                elif previous_task.early_date == 0:
+                    self.task.early_date = previous_task.duration
                 else:
-                    if previous_task.early_date == 0:
-                        max_previous_early_date = previous_task.duration
-                    else:
-                        max_previous_early_date = max(
-                            previous_task.early_date for previous_task in self.task.previous_tasks)
+                    max_previous_early_date = max(task.early_date for task in self.task.previous_tasks)
                     self.task.early_date = max_previous_early_date + self.task.duration
 
         end_task = Task.query.filter_by(name="End Task", project_id=self.project_id).first()
@@ -54,7 +53,7 @@ class TaskService:
         return max(0, self.task.late_date)
 
     def get_margin(self) -> int:
-        self.task.margin_date = self.task.early_date - self.task.late_date
+        self.task.margin_date = self.task.late_date - self.task.early_date
         return self.task.margin_date
 
     def get_critic_path(self) -> bool:

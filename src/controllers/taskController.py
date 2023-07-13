@@ -42,6 +42,7 @@ def create_task(project_id):
                 duration=task_duration,
                 project_id=project_id
             )
+            new_task.previous_tasks = []
             new_task.previous_tasks.extend(previous_tasks)
             db.session.add(new_task)
             db.session.commit()
