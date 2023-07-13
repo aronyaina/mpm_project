@@ -12,7 +12,7 @@ class TaskService:
         if not self.task.previous_tasks:
             begin_task = Task.query.filter_by(name="Begin Task", project_id=self.project_id).first()
             self.task.previous_tasks.extend([begin_task])
-            self.task.early_date = begin_task.early_date
+            self.task.early_date = 0
             self.next_tasks = [task.to_json() for task in self.task.next_tasks]
         else:
             for previous_task in self.task.previous_tasks:
@@ -21,8 +21,14 @@ class TaskService:
 
             self.task.previous_tasks = self.previous_tasks
             self.task.early_date = 0
-            self.task.early_date = max(previous_task.early_date for previous_task in self.task.previous_tasks) \
-                                   + self.task.duration
+            for previous_task in self.task.previous_tasks:
+                if previous_task.name == "Begin Task":
+                    self.task.early_date = 0
+                else:
+                    max_previous_early_date = max(
+                        previous_task.early_date for previous_task in self.task.previous_tasks)
+                    self.task.early_date = max_previous_early_date + self.task.duration
+
         return self.task.early_date
 
     def get_late_date(self) -> int:
