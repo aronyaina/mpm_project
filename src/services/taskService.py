@@ -25,10 +25,14 @@ class TaskService:
                 if previous_task.name == "Begin Task":
                     self.task.early_date = 0
                 else:
-                    max_previous_early_date = max(
-                        previous_task.early_date for previous_task in self.task.previous_tasks)
+                    if previous_task.early_date == 0:
+                        max_previous_early_date = previous_task.duration
+                    else:
+                        max_previous_early_date = max(
+                            previous_task.early_date for previous_task in self.task.previous_tasks)
                     self.task.early_date = max_previous_early_date + self.task.duration
 
+        end_task = Task.query.filter_by(name="End Task", project_id=self.project_id).first()
         return self.task.early_date
 
     def get_late_date(self) -> int:
@@ -50,13 +54,13 @@ class TaskService:
         return max(0, self.task.late_date)
 
     def get_margin(self) -> int:
-        self.task.margin_date = self.task.late_date - self.task.early_date
+        self.task.margin_date = self.task.early_date - self.task.late_date
         return self.task.margin_date
 
     def get_critic_path(self) -> bool:
         if self.task.margin_date == 0:
             self.task.is_critic = True
-            return self.task.is_critic
+        return self.task.is_critic
 
     def is_directly_linked_to(self, linked_task):
         visited = set()
@@ -73,7 +77,7 @@ class TaskService:
             for prev_task in current_task.previous_tasks:
                 if prev_task not in visited:
                     stack.append(prev_task)
-
+        end_task = Task.query.filter_by(name="End Task", project_id=self.project_id).first()
         return False
 
     def call_all(self):
@@ -105,7 +109,6 @@ def synchronize_all_task(project_id):
             for _previous_task in task.previous_tasks:
                 if service.is_directly_linked_to(_previous_task):
                     previous_tasks.append(_previous_task)
-            end_task.previous_tasks = previous_tasks
             if not end_task.previous_tasks:
                 end_task.early_date = 0
                 end_task.late_date = 0

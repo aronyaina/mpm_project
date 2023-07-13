@@ -75,6 +75,7 @@ def get_task_by_id(project_id, task_id):
                 task = Task.query.get(task_id)
 
                 if task:
+                    synchronize_all_task(project_id)
                     return jsonify(task.to_json())
                 else:
                     return jsonify({"error": "Task not found"}), 404
@@ -139,57 +140,23 @@ def delete_task_by_id(project_id, task_id):
     # Call the delete_task function to delete a task by its ID within a specific project
 
 
-def update_task_by_id(project_id, task_id):
+def update_end_task(project_id):
     try:
         project = Project.query.get(project_id)
         if not project:
             return jsonify({"error": "Project not found"}), 404
+        end_task = Task.query.filter_by(name="End Task", project_id=project_id).first()
+        new_task_previous_task_name = request.json.get('previous_task_name')
 
-        task = Task.query.get(task_id)
-        if not task:
-            return jsonify({"error": "Task not found"}), 404
+        for name in new_task_previous_task_name:
+            task = Task.query.filter_by(project_id=project_id, name=name).first()
+            end_task.previous_tasks = []
+            end_task.previous_tasks.append(task)
 
-        new_task_name = request.json.get('name')
-        new_task_duration = request.json.get('duration')
-        new_prev_task = request.json.get('previous_task_id')
-
-        if new_task_name is not None:
-            task.name = new_task_name
-        if new_task_duration is not None:
-            task.duration = new_task_duration
-
-        # Check if the previous task exists
-        if new_prev_task is not None:
-            previous_task = Task.query.filter_by(name=new_prev_task).first()
-            if previous_task:
-                task.previous_task = previous_task.id
-            else:
-                return jsonify({"error": "Previous task name doesn't exist.", "name_not_in_task": new_prev_task}), 404
-
-        task.datetime = datetime.now()
-        db.session.commit()
-
-        return jsonify(task.to_json())
-
+            synchronize_all_task(project_id)
+            new_task_data = end_task.to_json()
+            return jsonify(new_task_data)
     except Exception as e:
         print(e)
         return jsonify({"error": "An error occurred."}), 500
     # Call the update_task function to update a task by its ID within a specific project
-
-# def get_task_by_name(project_id):
-#     task_name = request.args.get('task_name')
-#     print(task_name)
-#     try:
-#         project = Project.query.get(project_id)
-#         if task_name:
-#             if project:
-#                 task = Task.query.filter_by(name=task_name).first()
-#                 if task:
-#                     return jsonify(task.to_json())
-#                 else:
-#                     return jsonify({"error": "Task not found"}), 404
-#             else:
-#                 return jsonify({"error": "Project not found"}), 404
-#     except Exception as e:
-#         print(e)
-#         return jsonify({"error": f"An error has occurred: {e}"}), 500

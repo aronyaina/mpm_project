@@ -41,6 +41,8 @@ class Task(db.Model):
                 'early_date': self.early_date,
                 'late_date': self.late_date,
                 'created_at': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                'previous_tasks': [task.id for task in self.previous_tasks],
+                'margin_date': self.margin_date
                 }
 
         json_data = json.dumps(data)
@@ -57,6 +59,6 @@ class Task(db.Model):
             'margin_date': self.margin_date,
             'is_critic': self.is_critic,
             'next_tasks': [task.id for task in self.next_tasks],
-            'previous_tasks': [task.id for task in self.previous_tasks]
+            'previous_tasks': [task.id for task in self.previous_tasks],
         }
         return task_json
