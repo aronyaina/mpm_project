@@ -91,7 +91,7 @@ def get_all_task(project_id):
         if project:
             task_name = request.args.get('task_name')
             if task_name:
-                task = Task.query.filter_by(name=task_name).first()
+                task = Task.query.filter_by(name=task_name, project_id=project_id).first()
                 if task:
                     return jsonify(task.to_json())
                 else:
