@@ -40,7 +40,7 @@ class Task(db.Model):
                 'duration': self.duration,
                 'early_date': self.early_date,
                 'late_date': self.late_date,
-                'created_at': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                # 'created_at': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),
                 'previous_tasks': [task.id for task in self.previous_tasks],
                 'margin_date': self.margin_date
                 }

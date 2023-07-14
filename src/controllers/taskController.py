@@ -93,6 +93,7 @@ def get_all_task(project_id):
         if project:
             task_name = request.args.get('task_name')
             if task_name:
+                synchronize_all_task(project_id)
                 task = Task.query.filter_by(name=task_name, project_id=project_id).first()
                 if task:
                     return jsonify(task.to_json())
@@ -149,14 +150,15 @@ def update_end_task(project_id):
         end_task = Task.query.filter_by(name="End Task", project_id=project_id).first()
         new_task_previous_task_name = request.json.get('previous_task_name')
 
+        end_task.previous_tasks = []
         for name in new_task_previous_task_name:
             task = Task.query.filter_by(project_id=project_id, name=name).first()
-            end_task.previous_tasks = []
             end_task.previous_tasks.append(task)
 
-            synchronize_all_task(project_id)
-            new_task_data = end_task.to_json()
-            return jsonify(new_task_data)
+        db.session.commit()
+        synchronize_all_task(project_id)
+        new_task_data = end_task.to_json()
+        return jsonify(new_task_data)
     except Exception as e:
         print(e)
         return jsonify({"error": "An error occurred."}), 500

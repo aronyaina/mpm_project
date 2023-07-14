@@ -1,3 +1,4 @@
+from database import db
 from src.models.taskModel import Task
 
 
@@ -7,6 +8,8 @@ class TaskService:
         self.previous_tasks = []
         self.task = task
         self.project_id = project_id
+        self.inverted_tasks = []
+        self.critic_tasks = []
 
     def get_early_date(self) -> int:
         if not self.task.previous_tasks:
@@ -28,29 +31,67 @@ class TaskService:
                 elif previous_task.early_date == 0:
                     self.task.early_date = previous_task.duration
                 else:
-                    max_previous_early_date = max(task.early_date for task in self.task.previous_tasks)
-                    self.task.early_date = max_previous_early_date + self.task.duration
+                    max_previous_early_date = max(task.early_date + task.duration for task in self.task.previous_tasks)
+                    self.task.early_date = max_previous_early_date
 
-        end_task = Task.query.filter_by(name="End Task", project_id=self.project_id).first()
         return self.task.early_date
 
     def get_late_date(self) -> int:
-        self.next_tasks = [task.to_json() for task in self.task.next_tasks]
+        # self.next_tasks = [task.to_json() for task in self.task.next_tasks]
+        # if not self.next_tasks:
+        #     self.task.next_tasks.extend([end_task])
+        #     end_duration = self.task.early_date + self.task.duration
+        #     end_task.early_date = 0
+        #     if end_task.early_date <= end_duration:
+        #         end_task.early_date = end_duration
+        #         end_task.late_date = end_task.early_date
+        #         self.task.late_date = end_task.late_date - self.task.duration
+        # else:
+        #     for next_task in self.next_tasks:
+        #         next_task_late_date = next_task["late_date"]
+        #         if next_task_late_date > self.task.late_date:
+        #             self.task.late_date = next_task_late_date - self.task.duration
         end_task = Task.query.filter_by(name="End Task", project_id=self.project_id).first()
-        if not self.next_tasks:
-            self.task.next_tasks.extend([end_task])
-            end_duration = self.task.early_date + self.task.duration
-            end_task.early_date = 0
-            if end_task.early_date <= end_duration:
-                end_task.early_date = end_duration
-            end_task.late_date = end_task.early_date
-            self.task.late_date = end_task.late_date - self.task.duration
-        else:
-            for next_task in self.next_tasks:
+        end_task.early_date = 0
+        self.task.late_date = 0
+        for prev_task in end_task.previous_tasks:
+            if end_task.early_date < (prev_task.early_date + prev_task.duration):
+                end_task.early_date = prev_task.early_date + prev_task.duration
+                end_task.late_date = end_task.early_date
+        for prev_task in end_task.previous_tasks:
+            if prev_task.id == self.task.id:
+                self.task.late_date = end_task.late_date - self.task.duration
+            if (self.task.late_date - self.task.early_date) == 0:
+                self.critic_tasks.append(self.task)
+        for task in self.critic_tasks:
+            for t in task.previous_tasks:
+                if task.late_date - t.duration == t.early_date:
+                    t.late_date = task.late_date - t.duration
+                    self.critic_tasks.append(t)
+
+        self.critic_tasks.insert(0, end_task)
+        # print([task.name for task in self.critic_tasks])
+        # for prev_task in self.critic_tasks:
+        #     for prev_prev_task in prev_task.previous_tasks:
+        #         if prev_prev_task in self.critic_tasks:
+        #             continue
+        #         elif prev_prev_task.late_date <= prev_task.late_date - prev_prev_task.duration:
+        #             prev_prev_task.late_date = prev_task.late_date - prev_task.duration
+
+        tasks = Task.query.filter_by(project_id=self.project_id).all()
+        self.inverted_tasks = tasks[::-1]
+        for task in self.inverted_tasks:
+            next_tasks = [task.to_json() for task in task.next_tasks]
+            n_late = end_task.late_date
+            for next_task in next_tasks:
                 next_task_late_date = next_task["late_date"]
-                if next_task_late_date <= self.task.late_date:
-                    self.task.late_date = next_task_late_date - self.task.duration
-        return max(0, self.task.late_date)
+                if next_task_late_date <= n_late:
+                    n_late = next_task_late_date
+            for next_task in next_tasks:
+                next_task_late_date = next_task["late_date"]
+                if next_task_late_date == n_late:
+                    task.late_date = next_task_late_date - task.duration
+        return self.task.late_date
 
     def get_margin(self) -> int:
         self.task.margin_date = self.task.late_date - self.task.early_date
@@ -59,6 +100,8 @@ class TaskService:
     def get_critic_path(self) -> bool:
         if self.task.margin_date == 0:
             self.task.is_critic = True
+        else:
+            self.task.is_critic = False
         return self.task.is_critic
 
     def is_directly_linked_to(self, linked_task):
@@ -71,12 +114,9 @@ class TaskService:
 
             if current_task == linked_task:
                 return True
-            if current_task.name == "End Task":
-                continue
             for prev_task in current_task.previous_tasks:
                 if prev_task not in visited:
                     stack.append(prev_task)
-        end_task = Task.query.filter_by(name="End Task", project_id=self.project_id).first()
         return False
 
     def call_all(self):
@@ -105,6 +145,7 @@ def synchronize_all_task(project_id):
 
         elif task.name == "End Task":
             previous_tasks = []
+            # print(f"{end_task.previous_tasks}\n\n")
             for _previous_task in task.previous_tasks:
                 if service.is_directly_linked_to(_previous_task):
                     previous_tasks.append(_previous_task)
